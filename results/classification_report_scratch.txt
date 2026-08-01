@@ -1,0 +1,12 @@
+                precision    recall  f1-score   support
+
+constellations     0.8261    0.6786    0.7451        28
+        cosmos     0.2222    0.1538    0.1818        26
+      galaxies     0.5179    0.7838    0.6237        37
+       nebulae     0.3600    0.3333    0.3462        27
+       planets     0.5806    0.6667    0.6207        27
+         stars     0.4737    0.3333    0.3913        27
+
+      accuracy                         0.5116       172
+     macro avg     0.4967    0.4916    0.4848       172
+  weighted avg     0.5015    0.5116    0.4961       172

@@ -1,0 +1,18 @@
+# Dataset (baixar separadamente - ver README seção 3.4)
+data/
+
+# Pesos do modelo (grandes; opcionalmente versionar via Git LFS ou link externo)
+# Comente a linha abaixo se quiser versionar os pesos diretamente no repositório
+# weights/*.pt
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
