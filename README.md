@@ -17,7 +17,9 @@ O projeto oferece **duas abordagens** de modelo:
    GPU ou acesso à internet. Treinada localmente em CPU.
 2. **Transfer Learning com ResNet18** (`--model transfer`): exige internet (para baixar os pesos
    pré-treinados da ImageNet) e idealmente uma GPU. Treinada no Google Colab (GPU T4) usando o
-   notebook `notebooks/transfer_learning_colab.ipynb`, e apresentou a melhor acurácia entre as duas.
+   notebook `notebooks/transfer_learning_colab.ipynb`, em duas etapas: primeiro com o backbone
+   congelado (*linear probe*), depois com fine-tuning das últimas camadas — a versão com melhor
+   acurácia entre as três.
 
 Os pesos treinados e os resultados (gráficos, métricas, matriz de confusão) de **ambas** as versões
 estão incluídos neste repositório, em `weights/` e `results/`.
@@ -129,7 +131,7 @@ python src/predict.py --image caminho/para/imagem.jpg --model scratch
 │   └── predict.py                 # inferência em uma única imagem
 ├── notebooks/
 │   └── transfer_learning_colab.ipynb   # notebook para treinar com GPU no Colab
-├── weights/                       # pesos do modelo treinado (best_model_scratch.pt)
+├── weights/                       # pesos treinados (scratch, transfer e transfer+fine-tuning)
 └── results/                        # gráficos, métricas e relatórios gerados
 ```
 
@@ -147,46 +149,48 @@ python src/predict.py --image caminho/para/imagem.jpg --model scratch
 
 ## 6. Resultados Obtidos
 
-Foram treinadas e avaliadas as duas versões do modelo descritas na Seção 1.
+Foram treinadas e avaliadas três versões do modelo:
 
 ### 6.1. Comparativo geral
 
 | Modelo | Ambiente | Acurácia no teste |
 |---|---|---|
 | CNN treinada do zero | CPU (sem GPU/internet) | 51,2% |
-| **Transfer Learning (ResNet18)** | **Google Colab (GPU T4)** | **55,8%** |
+| Transfer Learning — *linear probe* (backbone congelado) | Google Colab (GPU T4) | 58,7% |
+| **Transfer Learning + Fine-tuning** (`layer4` + `fc` destravados) | **Google Colab (GPU T4)** | **63,4%** |
 | Acerto aleatório (6 classes) | — | 16,7% |
 
-Ambos os modelos superam com folga o acerto aleatório. O transfer learning apresentou o melhor
-resultado, como esperado, por partir de um backbone (ResNet18) já treinado em milhões de imagens
-da ImageNet — mesmo com o backbone **congelado** (apenas a camada final foi treinada). Um ganho
-de desempenho ainda maior é esperado caso as últimas camadas do backbone sejam descongeladas e
-ajustadas (fine-tuning), o que fica registrado como sugestão de trabalho futuro.
+O melhor resultado veio do **fine-tuning**: partindo do modelo de transfer learning já treinado (camada
+final apenas), destravamos o último bloco convolucional da ResNet18 (`layer4`) e a camada final (`fc`),
+e os ajustamos por mais 10 épocas com taxa de aprendizado bem menor (1e-5 para `layer4`, 1e-4 para `fc`),
+para não destruir o conhecimento já aprendido. Esse ajuste elevou a acurácia de 58,7% para **63,4%** —
+um ganho de +4,7 pontos percentuais sobre o transfer learning "simples", e de +12,2 pontos sobre a CNN
+treinada do zero.
 
-### 6.2. Resultados por classe — Transfer Learning (ResNet18), melhor modelo
+### 6.2. Resultados por classe — melhor modelo (Transfer Learning + Fine-tuning)
 
 | Classe | Precisão | Recall | F1-score |
 |---|---|---|---|
-| Planetas | 0,8462 | 0,8148 | **0,8302** |
-| Constelações | 0,6875 | 0,7857 | 0,7333 |
-| Galáxias | 0,5806 | 0,4865 | 0,5294 |
-| Nebulosas | 0,4043 | 0,7037 | 0,5135 |
-| Estrelas | 0,3667 | 0,4074 | 0,3860 |
-| Cosmos | 0,6667 | 0,1538 | **0,2500** |
-| **Acurácia geral** | | | **0,5581** (172 imagens de teste) |
+| Planetas | 0,8276 | 0,8889 | **0,8571** (melhor) |
+| Constelações | 0,7692 | 0,7143 | 0,7407 |
+| Galáxias | 0,6047 | 0,7027 | 0,6500 |
+| Nebulosas | 0,6296 | 0,6296 | 0,6296 |
+| Estrelas | 0,4444 | 0,4444 | 0,4444 |
+| Cosmos | 0,5000 | 0,3846 | **0,4348** (pior) |
+| **Acurácia geral** | | | **0,6337** (172 imagens de teste) |
 
-**Análise:** *planetas* e *constelações* foram as classes mais bem reconhecidas — possuem elementos
-visuais mais distintivos (formas circulares nítidas; padrões de linhas/pontos sobre fundo escuro,
-respectivamente). *Cosmos* teve o pior recall (15,4%): a matriz de confusão mostra que a maioria de
-suas imagens foi confundida com *nebulae* (10 de 21 casos) e *stars*, refletindo a alta sobreposição
-visual entre essas três categorias — imagens genéricas de "céu profundo" muitas vezes não têm um
-elemento único que as diferencie claramente de nebulosas ou campos estelares.
+**Análise:** o fine-tuning trouxe ganhos em quase todas as classes, com destaque para *galáxias* (F1 de
+0,53 para 0,65) e *nebulosas* (F1 de 0,51 para 0,63). *Planetas* seguiu como a classe mais bem reconhecida
+em todas as versões do modelo — possui elementos visuais mais distintivos (formas circulares nítidas).
+*Cosmos* permanece a classe mais desafiadora: a matriz de confusão mostra que suas imagens ainda se
+confundem com *nebulae*, *stars* e *planets*, refletindo a natureza genérica dessas imagens de "céu
+profundo" no dataset, sem um elemento visual único que as diferencie claramente das demais categorias
+de céu noturno.
 
-Considerando 6 classes (acerto aleatório ≈ 16,7%), ambos os modelos tiveram desempenho consideravelmente
-acima do acaso, mesmo com poucos dados por classe (~120–235 imagens). As classes com melhor desempenho
-em ambas as versões foram *constelações*, *planetas* e *galáxias*; as com maior confusão entre si foram
-*cosmos*, *nebulosas* e *estrelas*, devido à similaridade visual entre imagens de céu estrelado, nebulosas
-e composições genéricas do "cosmos".
+Considerando 6 classes (acerto aleatório ≈ 16,7%), todos os modelos tiveram desempenho consideravelmente
+acima do acaso, mesmo com poucos dados por classe (~120–235 imagens). O padrão se repete nas três
+versões: *planetas* e *constelações* entre as classes mais bem reconhecidas; *cosmos*, *nebulosas* e
+*estrelas* concentrando a maior parte da confusão entre si, por sua alta similaridade visual.
 
 ## 7. Dificuldades Encontradas
 
@@ -203,7 +207,10 @@ e composições genéricas do "cosmos".
   T4), usando o notebook `notebooks/transfer_learning_colab.ipynb` — o treinamento levou poucos
   minutos com GPU, contra ~11 minutos da CNN do zero em CPU para um número semelhante de épocas.
 - **Hiperparâmetros**: ajuste do tamanho de imagem, batch size e taxa de aprendizado para equilibrar
-  tempo de treinamento (em CPU) e desempenho do modelo.
+  tempo de treinamento (em CPU) e desempenho do modelo. No fine-tuning, foi necessário usar taxas de
+  aprendizado bem baixas (1e-5 para as camadas convolucionais destravadas, 1e-4 para a camada final)
+  para ajustar o modelo sem destruir o que já havia sido aprendido no treinamento anterior — taxas
+  mais altas prejudicavam o desempenho já alcançado.
 
 ## 8. Autores — Grupo 4
 
